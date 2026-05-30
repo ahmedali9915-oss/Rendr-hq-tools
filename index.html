@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rendr HQ — Agency Tools</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0A0A0A; color: #FFF; }
+  input, textarea, button { font-family: inherit; }
+  input::placeholder, textarea::placeholder { color: #2A2A2A; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0A0A0A; }
+  ::-webkit-scrollbar-thumb { background: #222; }
+  @media (max-width: 600px) {
+    .layout { flex-direction: column !important; }
+    .sidebar { width: 100% !important; border-right: none !important; border-bottom: 1px solid #1A1A1A !important; padding: 12px 0 !important; display: flex !important; overflow-x: auto !important; }
+    .main { padding: 24px 20px !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const tools = [
+  {
+    id: "coldDM",
+    name: "Cold DM",
+    description: "Start conversations that convert.",
+    fields: [
+      { key: "targetType", label: "Target Business Type", placeholder: "e.g. Local restaurant owner" },
+      { key: "service", label: "Your Service", placeholder: "e.g. Done-for-you video content" },
+      { key: "problem", label: "Specific Problem You Noticed", placeholder: "e.g. They haven't posted in 3 weeks" }
+    ],
+    prompt: (d) => `Target: ${d.targetType}\nMy service: ${d.service}\nProblem noticed: ${d.problem}\n\nWrite a cold DM:\n- Under 4 lines\n- Mention the real problem\n- No fluff\n- No "I hope this finds you well"\n- End with a soft yes/no question\n- Sound like a real person, not a bot`
+  },
+  {
+    id: "followup",
+    name: "Follow-up Email",
+    description: "Re-engage a prospect who went silent.",
+    fields: [
+      { key: "serviceType", label: "Service Type", placeholder: "e.g. Monthly video content" },
+      { key: "clientType", label: "Client Type", placeholder: "e.g. Local restaurant owner" },
+      { key: "days", label: "Days Since Proposal", placeholder: "e.g. 5" }
+    ],
+    prompt: (d) => `Write a 4-line follow-up email to a client who went silent after I sent a proposal ${d.days} days ago.\n\nContext:\n- Service: ${d.serviceType}\n- Client type: ${d.clientType}\n\nRules:\n- Do not mention price\n- Add soft urgency\n- End with a yes/no question\n- Keep it short and clear\n- No cringe opener`
+  },
+  {
+    id: "proposal",
+    name: "Client Proposal",
+    description: "Write a professional project proposal.",
+    fields: [
+      { key: "serviceType", label: "Service Type", placeholder: "e.g. Video editing retainer" },
+      { key: "clientType", label: "Client Type / Industry", placeholder: "e.g. Local restaurant owner" },
+      { key: "budget", label: "Monthly Budget", placeholder: "e.g. $1,400" }
+    ],
+    prompt: (d) => `Act as a senior copywriter. Write a project proposal for a ${d.serviceType} for a ${d.clientType}. Budget: ${d.budget}\n\nInclude:\n- 3-line executive summary\n- Scope of work with 4 clear deliverables\n- 4-week timeline week by week\n- Simple pricing table\n- Strong closing CTA\n\nTone: confident, warm, simple words, no jargon.`
+  },
+  {
+    id: "scopeOfWork",
+    name: "Scope of Work",
+    description: "Generate a clean, professional SOW.",
+    fields: [
+      { key: "projectType", label: "Project Type", placeholder: "e.g. Monthly video content retainer" },
+      { key: "timeFrame", label: "Time Frame", placeholder: "e.g. 1 month, rolling" },
+      { key: "clientType", label: "Client Type", placeholder: "e.g. Local restaurant" }
+    ],
+    prompt: (d) => `Create a one-page Scope of Work for:\n- Project: ${d.projectType}\n- Duration: ${d.timeFrame}\n- Client: ${d.clientType}\n\nInclude:\n- 5 clear deliverables\n- 2-round revision policy\n- 3 things NOT included\n- Payment terms: 50% upfront, rest on delivery\n- Kill fee clause: 25% if cancelled mid-project\n\nUse plain English. Keep it simple. No legal jargon.`
+  },
+  {
+    id: "difficultClient",
+    name: "Difficult Client",
+    description: "Handle scope creep without losing the client.",
+    fields: [
+      { key: "extraRequest", label: "Extra Request from Client", placeholder: "e.g. Add 4 more videos this month" },
+      { key: "originalScope", label: "Original Agreement", placeholder: "e.g. 8 short form videos per month" },
+      { key: "projectPrice", label: "Project Price", placeholder: "e.g. $1,400/month" },
+      { key: "addOnPrice", label: "Price Per Extra Item", placeholder: "e.g. $150 per additional video" }
+    ],
+    prompt: (d) => `Client request: ${d.extraRequest}\nOriginal agreement: ${d.originalScope}\nProject price: ${d.projectPrice}\n\nWrite a reply email:\n- Say this is out of scope\n- Offer add-on at: ${d.addOnPrice}\n- Under 6 lines\n- Polite, firm, simple words\n- No passive-aggressive tone\n- Keep the relationship warm`
+  },
+  {
+    id: "rateIncrease",
+    name: "Rate Increase",
+    description: "Ask for more without losing the client.",
+    fields: [
+      { key: "duration", label: "Duration Working Together", placeholder: "e.g. 6 months" },
+      { key: "oldPrice", label: "Current Price", placeholder: "e.g. $800/month" },
+      { key: "newPrice", label: "New Price", placeholder: "e.g. $1,200/month" },
+      { key: "startDate", label: "Start Date for New Rate", placeholder: "e.g. July 1st" },
+      { key: "results", label: "Results You've Delivered", placeholder: "e.g. 3x engagement, 500 new followers" }
+    ],
+    prompt: (d) => `I have worked with a client for ${d.duration} at ${d.oldPrice}. I want to increase my rate to ${d.newPrice} starting ${d.startDate}.\n\nWrite a 5-line email:\n- Focus on value delivered\n- Mention results: ${d.results}\n- No apology\n- Clear and calm tone\n- Give them time to respond`
+  },
+  {
+    id: "testimonial",
+    name: "Testimonial Polisher",
+    description: "Turn weak feedback into powerful social proof.",
+    fields: [
+      { key: "testimonial", label: "Original Testimonial", placeholder: "Paste the raw testimonial here...", multiline: true },
+      { key: "metric", label: "Metric or Outcome to Highlight", placeholder: "e.g. 40% more bookings, 500 new followers" }
+    ],
+    prompt: (d) => `Rewrite this testimonial to make it more compelling:\n\n"${d.testimonial}"\n\nRules:\n- Make it more specific\n- Add the result: ${d.metric}\n- Keep the original person's voice and tone\n- Under 50 words\n- No corporate language`
+  }
+];
+
+function App() {
+  const [activeTool, setActiveTool] = useState(0);
+  const [formData, setFormData] = useState({});
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const tool = tools[activeTool];
+  const allFilled = tool.fields.every(f => (formData[f.key] || "").trim());
+
+  const handleInput = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
+
+  const handleGenerate = async () => {
+    if (!allFilled || loading) return;
+    setLoading(true);
+    setOutput("");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: tool.prompt(formData) }]
+        })
+      });
+      const data = await res.json();
+      setOutput(data.content?.map(b => b.text || "").join("") || "Something went wrong.");
+    } catch {
+      setOutput("Error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleToolChange = (i) => {
+    setActiveTool(i);
+    setFormData({});
+    setOutput("");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
+      {/* Header */}
+      <div style={{ padding: "16px 28px", borderBottom: "1px solid #1A1A1A", display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "-0.5px" }}>RENDR</span>
+        <div style={{ width: "15px", height: "15px", borderRadius: "50%", border: "1.5px solid #FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "4px", fontWeight: 700 }}>HQ</div>
+        <span style={{ marginLeft: "16px", fontSize: "10px", color: "#333", letterSpacing: "2px", textTransform: "uppercase" }}>Agency Tools</span>
+      </div>
+
+      <div className="layout" style={{ display: "flex", flex: 1 }}>
+
+        {/* Sidebar */}
+        <div className="sidebar" style={{ width: "200px", borderRight: "1px solid #1A1A1A", padding: "20px 0", flexShrink: 0 }}>
+          {tools.map((t, i) => (
+            <button
+              key={t.id}
+              onClick={() => handleToolChange(i)}
+              style={{
+                width: "100%",
+                padding: "11px 20px",
+                background: "transparent",
+                border: "none",
+                borderLeft: activeTool === i ? "2px solid #FFF" : "2px solid transparent",
+                color: activeTool === i ? "#FFF" : "#444",
+                textAlign: "left",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: activeTool === i ? 500 : 400,
+                transition: "all 0.1s",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Main */}
+        <div className="main" style={{ flex: 1, padding: "36px 44px", overflowY: "auto", maxWidth: "660px" }}>
+
+          <div style={{ marginBottom: "30px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: 700, letterSpacing: "-0.5px", marginBottom: "6px" }}>{tool.name}</h2>
+            <p style={{ fontSize: "13px", color: "#555" }}>{tool.description}</p>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "18px", marginBottom: "26px" }}>
+            {tool.fields.map(field => (
+              <div key={field.key}>
+                <label style={{ display: "block", fontSize: "10px", letterSpacing: "2px", color: "#444", textTransform: "uppercase", marginBottom: "7px" }}>
+                  {field.label}
+                </label>
+                {field.multiline ? (
+                  <textarea
+                    value={formData[field.key] || ""}
+                    onChange={e => handleInput(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    rows={4}
+                    style={{ width: "100%", background: "transparent", border: "1px solid #1E1E1E", color: "#FFF", fontSize: "14px", padding: "12px 16px", outline: "none", resize: "vertical", boxSizing: "border-box", lineHeight: 1.6 }}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={formData[field.key] || ""}
+                    onChange={e => handleInput(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    onKeyDown={e => e.key === "Enter" && allFilled && handleGenerate()}
+                    style={{ width: "100%", background: "transparent", border: "1px solid #1E1E1E", color: "#FFF", fontSize: "14px", padding: "12px 16px", outline: "none", boxSizing: "border-box" }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={!allFilled || loading}
+            style={{
+              background: allFilled && !loading ? "#FFF" : "#111",
+              color: allFilled && !loading ? "#0A0A0A" : "#333",
+              border: "none",
+              padding: "13px 28px",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: allFilled && !loading ? "pointer" : "not-allowed",
+              transition: "all 0.15s",
+              marginBottom: "28px",
+              letterSpacing: "-0.2px"
+            }}
+          >
+            {loading ? "Generating..." : "Generate →"}
+          </button>
+
+          {output && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontSize: "10px", letterSpacing: "2px", color: "#444", textTransform: "uppercase" }}>Output</span>
+                <button
+                  onClick={handleCopy}
+                  style={{ background: "transparent", border: "1px solid #222", color: copied ? "#FFF" : "#555", fontSize: "11px", padding: "5px 14px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.15s" }}
+                >
+                  {copied ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+              <div style={{ background: "#0F0F0F", border: "1px solid #1A1A1A", padding: "22px", fontSize: "14px", lineHeight: 1.8, whiteSpace: "pre-wrap", color: "#CCC" }}>
+                {output}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
